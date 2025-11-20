@@ -426,6 +426,39 @@ label={lst: header file for printf}]{./code/common_printf.h}
 \lstinputlisting[language=C, caption={(common.c) C file for printf}, label={lst:
 C file for printf}]{./code/common_printf.c}
 
+\subsubsection{What are the builtin features?}
+
+In Listing \ref{lst: header file for printf}, all of the \verb|define| macros map the
+standard variadic-names to compiler intrinsics. The standard variadic names are
+typically defined in \verb|<stdarg.h>| and allows functions to accept an
+indefinite number of arguments \cite{stdarg}. However, since we're writing our
+own kernel, \verb|<stdarg.h>| is not available to use so instead we use Clang's
+built-ins.
+\begin{enumerate}
+	\item \verb|__buildtin_va_list|: represents the internal structure that
+		stores the argument pointer
+	\item \verb|__builtin_va_start(ap, last)|: initalizes a \verb|va_list| to
+		start reading args after the parameter \verb|last|
+	\item \verb|__builtin_va_arg(ap, type)|: Fetches the next argument from the
+		list and converts it to \verb|type|
+	\item \verb|__builtin_va_end(ap)|: cleans up
+\end{enumerate}
+
+The arguments need to be \emph{variadic} because \verb|printf| can take any
+number of format specifiers. The various \verb|va_...| are used to loop through
+the arguments.
+
+\subsubsection{How are the builtin features used in printf?}
+
+In Listing \ref{lst: C file for printf}, line (6) declares a variable named
+\verb|vargs| of type \verb|va_list|. This stores the current position in the
+list of arguments but does not hold anything yet. Line (7) initalizes the
+\verb|va_list| so you can read arguments from it. It finds where the variable
+arguments begin in the stack/registers, sets \verb|vargs| to point immediately
+after \verb|fmt| and prepares \verb|vargs| so that calls to 
+\verb|va_arg(vargs,type)| will fetch each additional argument. After each call to
+\verb|av_arg(vargs, type)|, \verb|vargs| is automatically incremented to "point"
+to the next variable. 
 
 \printbibliography[
 heading=bibintoc
