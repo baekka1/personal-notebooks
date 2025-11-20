@@ -1,10 +1,10 @@
 \documentclass[final]{article}
-
+\usepackage[margin=1in]{geometry}
 \usepackage{amsmath, amsxtra, verbatim}
 \usepackage{amssymb, amsthm}
 \usepackage{graphicx}
+\graphicspath{./screenshots/}
 \usepackage[cmtip,all]{xy}
-\usepackage{xypic}
 \usepackage{listings, xcolor}
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
@@ -104,7 +104,7 @@ and store it in the register \textbf{a0}
 Below is a table of common registers in RISC-V and their given alias that we
 will use to refer to them in code.
 
-\begin{table}[h!]
+\begin{table}[ht]
 \centering
 \begin{tabular}{|l|c|p{5cm}|}
 \hline
@@ -164,9 +164,9 @@ With CPU instructions, there are privileged instructions that applications in
 user mode cannot execute. The \textbf{CSR (Control and Status Register)} is a
 register that sores CPU settings. We use the following:
 
-\begin{table} [h!]
+\begin{table} [ht]
 	\centering
-	\begin{tabular}{|p{4cm}|p{5cm}|}
+	\begin{tabular}{|p{4cm}|l|}
 		\hline
 		\textbf{Opcode and operands} & \textbf{Overview} \\ \hline
 		\verb|csrr rd, csr| & Read from CSR \\ \hline
@@ -192,9 +192,9 @@ Where its written in the form of:
 	__asm__ __volatile__("assembly" : output operands : input operands : clobbered registers);
 \end{lstlisting}
 
-\begin{table} [h!]
+\begin{table} [ht]
 	\centering
-	\begin{tabular}{|p{3cm}|p{6cm}|}
+	\begin{tabular}{|p{3cm}|p{8cm}|}
 		\hline
 		\textbf{Part} & \textbf{Description} \\ \hline
 		\verb|__asm__| & Indicates its inline assembly \\ \hline
@@ -258,7 +258,9 @@ itself".
 
 The SBI is an API for OS kernels, but defines what the firmware (OpenSBI)
 provides to an OS. In QEMU, OpenSBI starts by default, performs
-hardware-specific initalization, and boots the kernel.
+hardware-specific initalization, and boots the kernel. In other words, the SBI
+performs tasks on the hardware/controls the hardware on behalf of the OS. It can
+be analogous to a program making sys calls to the kernel.
 
 \subsection{Booting OpenSBI}
 
@@ -330,11 +332,100 @@ the kernel, which is then going to take things over from there \cite{qemu_boot}
 
 \subsection{Minimal kernel}
 
-The kernel starts executing from the \verb|boot| function (which was specified
-as the entry point in the linker script). 
-
 \lstinputlisting[language=C, caption={kernel code}, label={lst: kernel
 code}]{./code/kernel.c}
+
+The kernel starts executing from the \verb|boot| function (which was specified
+as the entry point in the linker script). 
+\begin{enumerate}
+	\item \verb|__attribute__((section(".text.boot")))| controls the placement
+		of the function in the linker script. Since OpenSBI jumps to
+		\verb|0x80200000| automatically, the boot code needs be to put there
+	\item \verb|__attribute__((naked))| instructs the compiler not to generate
+		any unnecessary code before and after the function body. This ensures
+		that the inline assembly code is the exact function body.
+\end{enumerate}
+
+In the \verb|boot| function, in line (24), the \verb|stack pointer (sp)| is set
+to the end address of the stack area thats defined in the linker script. Then,
+it jumps to the \verb|kernel_main| function.
+
+In line (5), \verb|extern| is used because these variables come from the linker
+script, and not \verb|kernel.c|. The \verb|char| and \verb|[]| that they are
+addresses, you can take the pointer value of it, and that its type is a pointer
+to char, which is a byte.
+
+In the \verb|main| function, the \verb|.bss| section is initalized to zero using
+\verb|memset|. Then, the function enters an infinite loop. This prevents the
+execution from leaving the controlled code.
+
+\subsection{First kernel debugging}
+
+Because the kernel enters an infinite loop, there are no indications that the
+kernel is running correctly. However, you can look at values of registers to see
+if anything has gone wrong. To do this, open the QEMU monitor and execute the
+\verb|info registers| command
+
+\begin{center}
+	\includegraphics[width=5in]{./screenshots/info_registers.png}
+\end{center}
+
+\section{Hello World!}
+
+Instead of having to look at registers to confirm whether something is working
+or not, want to make it more obvious by outputing a string from the kernel!
+
+\subsection{Hello via SBI}
+
+To use functions by the SBI, we use the \verb|ecall| function found in line (17)
+of Listing \ref{lst: using ecall}. But before that inline assembly code, we have
+to ask the compiler to place a few values in specified registers. That is
+accomplished in lines (7) - (14) in Listing \ref{lst: using ecall}.
+Specifically, the \verb|register| and \verb|__asm__("register name")| does this.
+
+When \verb|ecall| is evoked, the CPU's execution mode switches from kernel mode
+(S-Mode) to OpenSBI mode (M-Mode) and OpenSBI's processing handler is invoked.
+Once its finished, it switches back to kernel mode and execution resumes after
+the \verb|ecall| instruction.
+
+\smallskip
+
+\lstinputlisting[language=C, caption={(kernel.h) using ecall}, label={lst:
+header using ecall}]{./code/kernel_putchar.h}
+
+\smallskip
+
+\lstinputlisting[language=C, caption={(kernel.c) using ecall}, label={lst: using
+ecall}]{./code/kernel_putchar.c}
+
+In order to write to the console, need to use the OpenSBI call 
+\verb|Console Putchar|, which puts a character to the console. To make the call, we select
+function 0 and extension 1 (by putting \( 0 \) in register \verb|a6| and \( 1 \)
+in register \verb|a7|) \cite{sbicalls}. In addition, SBI functions must return a
+pair of values in \verb|a0| and \verb|a1| where the value in \verb|a0| is the
+error code. This is why we have the \verb|struct sbiret| definition in Listing
+\ref{lst: header using ecall}. In addition, \verb|Console Putchar| is guarenteed
+not to change registers \verb|a2| to \verb|a7|.
+
+\subsection{printf function}
+
+Now, we can implement the \verb|printf| function which, under the hood, simply
+prints the characters supplied to the function (using \verb|Console Putchar|).
+In this \verb|printf|, we are only going to support 3 format specifiers:
+\begin{enumerate}
+	\item \verb|%d| (decimal)
+	\item \verb|%x| (hexadecimal)
+	\item \verb|%s| (string)
+\end{enumerate}
+
+\lstinputlisting[language=C, caption={(common.h) header file for printf},
+label={lst: header file for printf}]{./code/common_printf.h}
+
+\smallskip
+
+\lstinputlisting[language=C, caption={(common.c) C file for printf}, label={lst:
+C file for printf}]{./code/common_printf.c}
+
 
 \printbibliography[
 heading=bibintoc
