@@ -1,0 +1,342 @@
+\documentclass[final]{article}
+
+\usepackage{amsmath, amsxtra, verbatim}
+\usepackage{amssymb, amsthm}
+\usepackage{graphicx}
+\usepackage[cmtip,all]{xy}
+\usepackage{xypic}
+\usepackage{listings, xcolor}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolor}{rgb}{0.95,0.95,0.92}
+\lstset{
+	backgroundcolor=\color{backcolor},
+	commentstyle=\color{codegreen},
+	keywordstyle=\color{codegray},
+	stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+	breakatwhitespace=false,
+	captionpos=b,
+    numbers=left,            % ← this gives you line numbers
+	numbersep=2pt,
+	showspaces=false,
+	showstringspaces=false,
+	showtabs=false,
+	tabsize=2
+}
+\usepackage{url}
+\usepackage[notcite, notref]{showkeys}
+\usepackage[colorlinks, linkcolor=blue]{hyperref}
+\usepackage[
+backend=biber,
+style=numeric,
+sorting=ynt
+]{biblatex}
+\addbibresource{references.bib}
+\usepackage{parskip}
+
+\theoremstyle{definition}
+\newtheorem{exercise}{Exercise}
+\newtheorem{problem}{Problem}
+\newtheorem*{solution}{Solution}
+\newtheorem*{definition}{Definition}
+\newtheorem{defins}{Definitions}
+\newtheorem{example}{Example}
+\newtheorem*{remark}{Remark}
+\newtheorem*{note}{Note}
+\newtheorem*{conjecture}{Conjecture}
+
+\title{OS in 1000 Lines Notes}
+\author{Katie Baek}
+\date{\today}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{3cm}
+    {\Huge\bfseries OS in 1000 Lines Notes \par}
+    \vspace{2cm}
+    {\Large Katie Baek\par}
+    \vspace{0.3cm}
+    {\large Boston College\par}
+    \vfill
+    % include BC or HAZUS logo?
+    \vfill
+    {\large \textit{Notes from coding OS in 1000 lines}\par}
+    \vspace{0.2cm}
+    {\large \today\par} % or replace with a fixed date
+\end{titlepage}
+
+\maketitle
+
+\begin{abstract}
+	\input{./abstract.tex}
+\end{abstract}
+
+\tableofcontents
+
+\section{RISC-V 101}
+
+The chosen CPU for this book is RISC-V, specifically, the 32-bit RISC-V. This is
+because there is well-written documentation and it has been rising in popularity
+in the recent years. The underlying machine is the QEMU virtual machine.
+Although this does not exist in the real world, it's simple and similar to a lot
+of real devices.
+
+\subsection{RISC-V Assembly}
+
+In order to write an OS, you need to write some assembly. Here is an example of
+assembly code:
+
+\begin{lstlisting}
+	addi a1 a0 123
+\end{lstlisting}
+
+The first instruction \emph{addi} is the instruction name (opcode). The entire
+line tells the computer to add the value \textbf{123} to the value \textbf{a1}
+and store it in the register \textbf{a0}
+
+\subsection{Registers in RISC-V}
+
+Below is a table of common registers in RISC-V and their given alias that we
+will use to refer to them in code.
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{|l|c|p{5cm}|}
+\hline
+\textbf{Register} & \textbf{ABI Name (alias)} & \textbf{Description} \\ \hline
+\verb|pc| & \verb|pc| & Program counter (where the next instruction is) \\
+\hline
+\verb|x0| & \verb|zero| & Hardwired zero (always reads as zero) \\ \hline
+\verb|x1| & \verb|ra| & Return address \\ \hline
+\verb|x2| & \verb|sp| & Stack pointer \\ \hline
+\verb|x5-x7| & \verb|t0-t2| & Temporary registers \\ \hline
+\verb|x8| & \verb|fp| & Stack frame pointer \\ \hline
+\verb|x10-x11| & \verb|a0-a1| & Function arguments/return values \\ \hline
+\verb|x12-x17| & \verb|a2-a7| & Function arguments \\ \hline
+\verb|x18-x27| & \verb|s0-s11| & Temporary registers saved across calls \\
+\hline
+\verb|x28-x31| & \verb|t3-t6| & Temporary registers \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Memory access}
+
+Most data is stored in memory, then moved to registers when its needed and so
+there are instructions which do this:
+
+\begin{lstlisting}
+	lw a0, (a1)
+	sw a0, (a1)
+\end{lstlisting}
+
+In line 1, you read a word from the address that is stored in \verb|a1|
+and store it in \verb|a0|. The equivalent C code is \verb|a0 = *a1|. You are
+doing the same thing in line 2, but storing the word instead of
+loading it. The \verb|(...)| is like a pointer dereference.
+
+
+\subsection{Stack}
+
+The stack is a LIFO (last in first out) memory space used for function calls and
+local variables. It grows downwards, and the stack pointer, \verb|sp| points to
+the "top" of the stack (but functionally the bottom since again, it grows
+downwards). To push onto the stack, decrement the stack pointer and store the
+value:
+\begin{lstlisting}
+	addi sp, sp -4 // Move the stack pointer down by 4 bytes
+	sw a0, (sp) // Store a0 to the stack
+\end{lstlisting}
+
+To pop from the stack, load the value and increment the stack pointer:
+\begin{lstlisting}
+	lw a0, (sp) // Load a0 from the stack
+	addi sp, sp 4 // Move the stack pointer up by 4 bytes
+\end{lstlisting}
+
+\subsection{Privileged instructions}
+
+With CPU instructions, there are privileged instructions that applications in
+user mode cannot execute. The \textbf{CSR (Control and Status Register)} is a
+register that sores CPU settings. We use the following:
+
+\begin{table} [h!]
+	\centering
+	\begin{tabular}{|p{4cm}|p{5cm}|}
+		\hline
+		\textbf{Opcode and operands} & \textbf{Overview} \\ \hline
+		\verb|csrr rd, csr| & Read from CSR \\ \hline
+		\verb|csrw csr, rs| & Write to CSR \\ \hline
+		\verb|csrrw rd, csr, rs| & Read from and write to CSR at once \\ \hline
+		\verb|sret| & Return from trap handler \\ \hline
+		\verb|sfence.vma| & Clear Translation Lookaside Buffer (TLB) \\ \hline
+	\end{tabular}
+\end{table}
+
+\subsection{Inline assembly}
+
+Inline assembly code for C looks like this:
+\begin{lstlisting}[language=C, caption={sample inline assembly code},
+	label={lst: inline assembly}]
+	uint32_t value;
+	__asm__ __volatile__("csrr %0, sepc" : "=r(value)");
+\end{lstlisting}
+
+Where its written in the form of:
+\begin{lstlisting} [caption={format of inline assembly code}, label={lst: format
+	inline assembly}]
+	__asm__ __volatile__("assembly" : output operands : input operands : clobbered registers);
+\end{lstlisting}
+
+\begin{table} [h!]
+	\centering
+	\begin{tabular}{|p{3cm}|p{6cm}|}
+		\hline
+		\textbf{Part} & \textbf{Description} \\ \hline
+		\verb|__asm__| & Indicates its inline assembly \\ \hline
+		\verb|__volatile__| & Tell the compiler not to optimize the "assembly"
+		code \\ \hline
+		\verb|"assembly"| & Assembly code written as a string literal \\ \hline
+		output operands & C variables to store the results of the assembly \\
+		\hline
+		input operands & C expressions to be used in the assembly \\ \hline
+		clobbered registers & Registers whose contents are destroyed in the
+		assembly. If forgotten, the C compiler won't preserve the contents of
+		these registers and would cause a bug. \\ \hline
+	\end{tabular}
+\end{table}
+
+In the code \ref{lst: inline assembly}, this reads the value of \verb|sepc| CSR
+using the \verb|scrr| instruction and assigns it to the \verb|value| variable.
+
+\begin{lstlisting}[caption={different sample inline assembly code}, label={lst:
+	different inline assembly}]
+	__asm__ __volatile__("csrw sscratch, %0" : : "r"(123))
+\end{lstlisting}
+
+In the code \ref{lst: different inline assembly}, this writes \verb|123| to the
+\verb|sscratch| CSR, using the \verb|csrw| instruction. The C compiler
+automatically sets \verb|123| to the register \verb|a0| so that the assembly can
+be executed as written which is nice because then the dev doesn't have to worry
+about it.
+
+\section{Overview}
+
+\subsection{Features}
+
+We will implement the following features:
+\begin{enumerate}
+	\item \textbf{Multitasking}: Switch between processes to allow multiple
+		applications to share the CPU
+	\item \textbf{Execption Hanlder}: Handle events requiring OS intervention,
+		such as illegal instructions
+	\item \textbf{Paging}: Provide an isolated memory address space for each
+		application
+	\item \textbf{System calls}: Allow applications to call kernel features
+	\item \textbf{Device drivers}: Abstract hardware functionalities, such as
+		disk read/write
+	\item \textbf{File system}: Manage files on disk
+	\item \textbf{Command-line shell}: User interface for humans
+\end{enumerate}
+
+\section{Boot}
+
+What happens when the computer is turned on? The CPU initalizes itself and
+starts executing the OS. The OS then initalizes the hardware and starts the
+applications. This process is called "booting". 
+
+What happens before the OS starts? In PCs, BIOS initalizes the hardware, displays
+the splash screen, and loads the OS from the disk. In QEMU virt machine,
+\textbf{OpenSBI} is the equivalent of BIOS. This is the CPU "initalizing
+itself".
+
+\subsection{Supervisor Binary Interface (SBI)}
+
+The SBI is an API for OS kernels, but defines what the firmware (OpenSBI)
+provides to an OS. In QEMU, OpenSBI starts by default, performs
+hardware-specific initalization, and boots the kernel.
+
+\subsection{Booting OpenSBI}
+
+The following shell code starts OpenSPI:
+
+\begin{lstlisting}[caption={script to start OpenSBI}, label={lst: script-OpenSBI}]
+	#!bin/bash
+	set -xue
+
+	# QEMU file path
+	QEMU=qemu-system-riscv32
+
+	# Start QEMU
+	$QEMU -machine virt -bios default -nographic -serial mon:stdio --no-reboot
+\end{lstlisting}
+
+
+With this shell script, you can boot OpenSBI. Specifically, the 
+\verb|-bios default| option tells QEMU to use the default firmware, which is OpenSBI. In
+addition, at this point, QEMU's standard input and standard output is connected
+to the virtual machine's serial port, and the characters that you type in are
+being sent to OpenSBI but there is no one to read the characters. This is
+because there is literally no OS. In order to do anything, we have to interact
+with QEMU (which is the software emulator and a type-2 hypervisor).
+
+Press Ctrl+A then C to switch to the QEMU debug console (QEMU monitor)
+
+Here are the other options which are used in the run script:
+\begin{enumerate}
+	\item \verb|-machine vert|: Start a \verb|vert| machine
+	\item \verb|-bios default|: Use the default firmware (OpenSBI)
+	\item \verb|-nographic|: Start QEMU without a GUI window
+	\item \verb|-serial mon:stdio|: Connect QEMU's standard IO to the virtual
+		machine's serial port. Specifying \verb|mon:| allows switching to the
+		QEMU monitor by pressing Ctrl + A then C
+	\item \verb|--no-reboot|: If the virtual machine crashes, stop the emulator
+		without rebooting (useful for debugging)
+\end{enumerate}
+
+\subsection{Linker script}
+
+\lstinputlisting[caption={the linker script}, label={lst: linker
+script}]{./code/kernel.ld}
+
+The linker script is a file which defines the memory layout of executable files.
+Based on the layout, the linker assigns memory address to functions and
+variables. AKA this tells the linker exactly where in memory all parts of the
+program should live. You need this because during the \textbf{boot} process,
+there is no OS, no loader, and no runtime environment to relocate the code for
+you. Specifically, the linker script controls:
+\begin{enumerate}
+	\item Where the code is placed in memory
+	\item Where global variables, stacks, and boot code lives
+	\item The address of symbols used by startup code
+	\item How the final binary is organized
+\end{enumerate}
+
+
+\subsubsection{Why do you need one during boot?}
+
+When a computer boots, the CPU starts executing from a well-defined hardware
+reset address. In this case, it is \verb|0x80200000|. The boot code \emph{must}
+be there or else the CPU would start executing whatever is at that address. In
+addition, it also defines the variables \verb|__bss|, \verb|__bss_end|, and
+\verb|__stack_top| with specific addresses.
+
+The boot code needs to ensure that the hardware is in a state to find and load
+the kernel, which is then going to take things over from there \cite{qemu_boot}
+
+\subsection{Minimal kernel}
+
+The kernel starts executing from the \verb|boot| function (which was specified
+as the entry point in the linker script). 
+
+\lstinputlisting[language=C, caption={kernel code}, label={lst: kernel
+code}]{./code/kernel.c}
+
+\printbibliography[
+heading=bibintoc
+]
+\end{document}
