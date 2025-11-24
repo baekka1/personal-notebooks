@@ -1,0 +1,88 @@
+\documentclass[final]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amsxtra, verbatim}
+\usepackage{amssymb, amsthm}
+\usepackage{graphicx}
+\graphicspath{./imgs/}
+\usepackage[cmtip,all]{xy}
+\usepackage{listings, xcolor}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolor}{rgb}{0.95,0.95,0.92}
+\lstset{
+	backgroundcolor=\color{backcolor},
+	commentstyle=\color{codegreen},
+	keywordstyle=\color{codegray},
+	stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+	breakatwhitespace=false,
+	captionpos=b,
+    numbers=left,            % ← this gives you line numbers
+	numbersep=2pt,
+	showspaces=false,
+	showstringspaces=false,
+	showtabs=false,
+	tabsize=2
+}
+\usepackage{url}
+\usepackage[notcite, notref]{showkeys}
+\usepackage[colorlinks, linkcolor=blue]{hyperref}
+\usepackage[
+backend=biber,
+style=numeric,
+sorting=ynt
+]{biblatex}
+\addbibresource{references.bib}
+\usepackage{parskip}
+
+\theoremstyle{definition}
+\newtheorem{exercise}{Exercise}
+\newtheorem{problem}{Problem}
+\newtheorem*{solution}{Solution}
+\newtheorem*{definition}{Definition}
+\newtheorem{defins}{Definitions}
+\newtheorem{example}{Example}
+\newtheorem*{remark}{Remark}
+\newtheorem*{note}{Note}
+\newtheorem*{conjecture}{Conjecture}
+
+\title{Title}
+\author{Katie Baek}
+\date{\today}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{3cm}
+    {\Huge\bfseries Title \par}
+    \vspace{2cm}
+    {\Large Katie Baek\par}
+    \vspace{0.3cm}
+    {\large Boston College\par}
+    \vfill
+    % include BC or HAZUS logo?
+    \vfill
+    {\large \textit{Subtitle}\par}
+    \vspace{0.2cm}
+    {\large \today\par} % or replace with a fixed date
+\end{titlepage}
+
+\maketitle
+
+\begin{abstract}
+	\input{./abstract.tex}
+\end{abstract}
+
+\tableofcontents
+
+\section{Introduction}
+
+
+\printbibliography[
+heading=bibintoc
+]
+
+\end{document}
