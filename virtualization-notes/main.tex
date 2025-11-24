@@ -72,6 +72,24 @@ first to write our own OS, then hypervisor, then tackle the Openstack part,
 where we're trying to add Firecracker support (microVM). This involves having
 a lot of background knowledge into how an OS works and how a hypervisor works.
 
+\section{All about the OS}
+
+There are many types of operating systems out there, each with their own,
+slightly different design, but they all fundametnally do the same thing and keep
+to a common design principle. That is what this discussion is about. How does
+the OS actually function? What sort of things does the operating system have to
+account for in order to run smoothly? What is the job of the OS?
+
+We are going to start with the last question. What is the job of the operating
+system? In simple terms, it provides a software abstraction that allows
+developers/applications to use a clean interface to interact with the components of a
+computer. Its other job is to manage the hardware resources to ensure that
+everything runs smoothly and efficiently. Put in other terms, its a layer of
+software that "sits" on top of the hardware that manages the resources and
+allows for a clean and easy way for apps to interact with computer resources. It
+also manages the entire computer. It is the taskmaster which does a lot of heavy
+lifting to ensure that the end users have a working machine.
+
 \section{Breaking through abstractions}
 
 The computer is a very complex machine which contains many level of abstractions
