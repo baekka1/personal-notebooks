@@ -86,6 +86,50 @@ in the recent years. The underlying machine is the QEMU virtual machine.
 Although this does not exist in the real world, it's simple and similar to a lot
 of real devices.
 
+RISC-V a free and open standard ISA, based on Reduced Instruction Set Computer
+principles (designed to simply instructions given to computers to accomplish
+tasks). 
+
+\subsection{But what is an ISA?}
+
+The Instruction Set Architecture (ISA) defines the language that the computer
+can "think" in (defines its programmable interface):
+\begin{enumerate}
+	\item Instruction set
+	\item Register names and meanings
+	\item Calling conventions
+	\item Trap/exception behavior
+	\item Privilege levels
+	\item Memory model
+	\item Page table formats
+	\item How the system calls work
+	\item How interrupts are delivered
+\end{enumerate}
+
+A device that interprets instructions defined by an ISA is an implementation of
+the ISA. If a devices implements an ISA, then the software that that devices
+runs must also comply with that same ISA. A program which was compiled for the
+x86 ISA can't necessarily run on the ARM ISA and that is because the way that
+they encode instructions are different.
+
+\subsubsection{Why does the OS care about the ISA?}
+
+The ISA is everything to the OS. As stated above, the ISA defines its
+programmable interface. The OS must be able to do things like handle traps,
+interrupts, and exceptions. It must also set up virtual memory. AKA the OS must
+obey the rules of the ISA in order to function.
+
+\subsubsection{How is the ISA different from the ABI?}
+
+First off, what is Application Binary Interface (ABI)? The ABI is sort like a
+contract that compiled binaries follow in order to interact with each other
+\cite{abi-blog}.
+This way, new updates to a kernel or some other program don't break the
+functionality of the old ones and things are backwards compatible. Having
+knowledge of the ABI isn't necessary to building the OS (I think), but I've ran
+into the ABI enough times when researching that it was worth finally writing it
+down.
+
 \subsection{RISC-V Assembly}
 
 In order to write an OS, you need to write some assembly. Here is an example of
@@ -243,6 +287,37 @@ We will implement the following features:
 	\item \textbf{Command-line shell}: User interface for humans
 \end{enumerate}
 
+
+\subsection{QEMU}
+
+\textbf{QEMU} is a machine emulator which can emulate a variety of different
+machines. This means that it provides a virtual model of a computer (CPU,
+memory, and emulated devices). Since we are writing an OS for the RISC-V ISA, we are using the
+machine \verb|virt|. \verb|virt| does not exist in the real world and so it is
+only used in virtual machines, but it emulates a 32-bit CPU which implements
+the RISC-V ISA along with other devices that could be used in a computer
+\cite{virt}.
+
+\subsubsection{So QEMU is not a hypervisor?}
+
+Yes, QEMU is a machine emulator and \emph{not} a hypervisor. A hypervisor is
+able to execute instructions on the host CPU. QEMU just emulates the execution
+and so it is not a hypervisor. The emulator pretends to be hardware while the
+hypervisor lets the guest use the real hardware safely. However, both are
+similar in that they allow you to create that virtual machine abstraction.
+Within this virtual machine abstraction, we are aiming to develop an OS. This OS
+does not know that it's in a VM and it does not know that the machine is being
+emulated.
+
+\subsection{QEMU Monitor}
+
+The QEMU monitor is how you can interact with QEMU itself. It is used to:
+\begin{enumerate}
+	\item Remove or insert removable media images (CD-ROM or floppy disks)
+	\item Freeze/unfreeze the VM or save/restore its state from a disk file
+	\item Inspect the VM state without an external debugger
+\end{enumerate}
+
 \section{Boot}
 
 What happens when the computer is turned on? The CPU initalizes itself and
@@ -373,13 +448,15 @@ if anything has gone wrong. To do this, open the QEMU monitor and execute the
 \section{Hello World!}
 
 Instead of having to look at registers to confirm whether something is working
-or not, want to make it more obvious by outputing a string from the kernel!
+or not, want to make it more obvious by printing something to the debug console.
 
 \subsection{Hello via SBI}
 
 To use functions by the SBI, we use the \verb|ecall| function found in line (17)
 of Listing \ref{lst: using ecall}. But before that inline assembly code, we have
-to ask the compiler to place a few values in specified registers. That is
+to ask the compiler to place a few values in specified registers.
+Those registers are the ones reserved for the kernel.
+That is
 accomplished in lines (7) - (14) in Listing \ref{lst: using ecall}.
 Specifically, the \verb|register| and \verb|__asm__("register name")| does this.
 
@@ -449,6 +526,10 @@ number of format specifiers. The various \verb|va_...| are used to loop through
 the arguments.
 
 \subsubsection{How are the builtin features used in printf?}
+
+Typically, function arguments are stored in registers. Since the number of
+arguments is variadic, the arguments are stored in memory, then loaded into the
+registers using the \verb|builtin| features.
 
 In Listing \ref{lst: C file for printf}, line (6) declares a variable named
 \verb|vargs| of type \verb|va_list|. This stores the current position in the
