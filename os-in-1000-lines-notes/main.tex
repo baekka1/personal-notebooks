@@ -337,6 +337,19 @@ hardware-specific initalization, and boots the kernel. In other words, the SBI
 performs tasks on the hardware/controls the hardware on behalf of the OS. It can
 be analogous to a program making sys calls to the kernel.
 
+The SBI is specific to RISC-V. It defines how an S-mode operating system (like
+the one that we're developing) requests previliged operations from M-mode
+firmware. This is a design choice for RISC-V specifically, as, again, it is
+based on the \emph{reduced} instruction set computer principles. The S-mode is
+the mode in which the kernel operates, M-mode is the mode in which OpenSBI
+operates, and the U-mode is the mode in which the user operates. Since the
+kernel is in S-mode, it cannot make the privileged calls, where privileged
+instructions include things that involve the hardware (like printing to
+console). If the kernel wants to make that call, then OpenSBI traps the
+instruction, does the printing, then hands control back to the kernel. OpenSBI
+is software which complies with the RISC-V SBI and allows the kernel to interact
+with the firmware in a standardized manner.
+
 \subsection{Booting OpenSBI}
 
 The following shell code starts OpenSPI:
@@ -540,6 +553,25 @@ after \verb|fmt| and prepares \verb|vargs| so that calls to
 \verb|va_arg(vargs,type)| will fetch each additional argument. After each call to
 \verb|av_arg(vargs, type)|, \verb|vargs| is automatically incremented to "point"
 to the next variable. 
+
+\section{C Standard Library}
+
+\lstinputlisting[language=C, caption={new additions to common.h}, label={lst:
+new additions to common.h}] {./code/common_c_stand_lib.h}
+
+A few useful macros (in Listing \ref{lst: new additions to common.h}):
+\begin{enumerate}
+	\item \verb|paddr_t|: A type representing physical memory address
+	\item \verb|vaddr_t|: A type representing virtual memory addresses
+	\item \verb|align_up|: Round up \verb|value| to the nearest multiple of
+		\verb|align| and \verb|align| must be a power of 2
+	\item \verb|is_aligned|: Checks if \verb|value| is a multiple of \verb|align|
+	\item \verb|offsetof|: Returns the offset of a member within a structure
+		(how many bytes from the start of the structure)
+\end{enumerate}
+
+\subsection{Memory operation}
+
 
 \printbibliography[
 heading=bibintoc
